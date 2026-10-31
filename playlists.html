@@ -337,7 +337,7 @@
     });
   }
 
-  function loadSpotifyMap() {
+  function loadSpotifyMap(names) {
     var cachedMap = null;
     try {
       var raw = localStorage.getItem(SPOTIFY_CACHE);
@@ -350,7 +350,12 @@
       if (Date.now() - cachedMap.at < SPOTIFY_TTL_MS) return;
     }
 
-    fetch(SPOTIFY_FN).then(function (r) {
+    var url = SPOTIFY_FN;
+    if (names && names.length) {
+      url += "?names=" + encodeURIComponent(names.join("|"));
+    }
+
+    fetch(url).then(function (r) {
       if (!r.ok) throw new Error(r.status);
       return r.json();
     }).then(function (d) {
@@ -365,20 +370,26 @@
     });
   }
 
+  function namesOf(lists) {
+    return lists.map(function (l) { return l.name; });
+  }
+
   // Show cached list instantly, but always re-check in the background.
   var cached = readCache();
-  if (cached) render(cached.lists);
+  if (cached) {
+    render(cached.lists);
+    loadSpotifyMap(namesOf(cached.lists));
+  }
 
   fetchLists().then(function (lists) {
     writeCache(lists);
     render(lists);
     applySpotifyLinks();
+    loadSpotifyMap(namesOf(lists));
   }).catch(function (err) {
     if (cached) return; // stale view already shown
     statusEl.textContent = "Couldn’t load playlists (" + err.message + "). Try refreshing.";
   });
-
-  loadSpotifyMap();
 })();
 </script>
 </body>
