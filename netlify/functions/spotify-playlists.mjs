@@ -1,19 +1,15 @@
 // netlify/functions/spotify-playlists.mjs
 //
-// Returns a { "playlist name in lowercase": "spotifyPlaylistId" } map built from
-// the public playlists on a Spotify account. The playlists page uses it to link
-// each card straight to its Spotify twin instead of a search page.
+// Returns { "playlist name in lowercase": "spotifyPlaylistId" } for the
+// playlists named in the ?names= query string (pipe-separated).
 //
-// Credentials come from Netlify environment variables and never reach the browser:
+// Credentials come from Netlify environment variables, never the browser:
 //   SPOTIFY_CLIENT_ID
 //   SPOTIFY_CLIENT_SECRET
-//
-// Any failure returns an empty map rather than an error status, so the page
-// quietly falls back to its built-in map / search links instead of breaking.
 
 const SPOTIFY_USER = "grifforama";
 
-export default async () => {
+export default async (req) => {
   const id = process.env.SPOTIFY_CLIENT_ID;
   const secret = process.env.SPOTIFY_CLIENT_SECRET;
 
@@ -21,42 +17,90 @@ export default async () => {
     return json({ map: {}, error: "SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET not set" });
   }
 
+  const names = (new URL(req.url).searchParams.get("names") || "")
+    .split("|")
+    .map((n) => n.trim())
+    .filter(Boolean);
+
+  const diagnostics = {};
+
   try {
-    // 1. App token (client credentials — no user login involved)
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        authorization: "Basic " + Buffer.from(id + ":" + secret).toString("base64")
-      },
-      body: "grant_type=client_credentials"
-    });
-    if (!tokenRes.ok) throw new Error("token request failed: " + tokenRes.status);
-    const token = (await tokenRes.json()).access_token;
-    if (!token) throw new Error("no access token returned");
+    const token = await getToken(id, secret);
 
-    // 2. Walk the user's public playlists
-    const map = {};
-    let url = "https://api.spotify.com/v1/users/" +
-      encodeURIComponent(SPOTIFY_USER) + "/playlists?limit=50";
-
-    while (url) {
-      const res = await fetch(url, { headers: { authorization: "Bearer " + token } });
-      if (!res.ok) throw new Error("playlists request failed: " + res.status);
-      const data = await res.json();
-      for (const p of data.items || []) {
-        if (p && p.name && p.id) map[normalize(p.name)] = p.id;
+    // --- Strategy 1: the user's public playlists ---------------------------
+    try {
+      const map = {};
+      let url = "https://api.spotify.com/v1/users/" +
+        encodeURIComponent(SPOTIFY_USER) + "/playlists?limit=50";
+      while (url) {
+        const res = await fetch(url, { headers: { authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error("status " + res.status);
+        const data = await res.json();
+        for (const p of data.items || []) {
+          if (p && p.name && p.id) map[normalize(p.name)] = p.id;
+        }
+        url = data.next;
       }
-      url = data.next;
+      diagnostics.listPlaylists = "ok (" + Object.keys(map).length + ")";
+      if (Object.keys(map).length) return json({ map, via: "list", diagnostics });
+    } catch (e) {
+      diagnostics.listPlaylists = "failed: " + (e.message || e);
     }
 
-    return json({ map, count: Object.keys(map).length });
+    // --- Strategy 2: search for each requested name ------------------------
+    if (!names.length) {
+      return json({ map: {}, via: "search", diagnostics, error: "no names supplied" });
+    }
+
+    const map = {};
+    for (const name of names) {
+      try {
+        const url = "https://api.spotify.com/v1/search?type=playlist&limit=20&q=" +
+          encodeURIComponent(name);
+        const res = await fetch(url, { headers: { authorization: "Bearer " + token } });
+        if (!res.ok) {
+          diagnostics.search = diagnostics.search || ("failed: status " + res.status);
+          break;
+        }
+        const data = await res.json();
+        const items = ((data.playlists && data.playlists.items) || []).filter(Boolean);
+        const wanted = normalize(name);
+
+        const mine = items.filter(
+          (p) => p.owner && String(p.owner.id || "").toLowerCase() === SPOTIFY_USER.toLowerCase()
+        );
+        const hit = mine.find((p) => normalize(p.name) === wanted) || mine[0];
+        if (hit && hit.id) map[wanted] = hit.id;
+      } catch (e) {
+        diagnostics.search = diagnostics.search || ("failed: " + (e.message || e));
+        break;
+      }
+    }
+    if (!diagnostics.search) {
+      diagnostics.search = "ok (" + Object.keys(map).length + "/" + names.length + ")";
+    }
+
+    return json({ map, via: "search", diagnostics });
   } catch (err) {
-    return json({ map: {}, error: String((err && err.message) || err) });
+    return json({ map: {}, error: String((err && err.message) || err), diagnostics });
   }
 };
 
-// Must match the normalisation the page uses when looking names up.
+async function getToken(id, secret) {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      authorization: "Basic " + Buffer.from(id + ":" + secret).toString("base64")
+    },
+    body: "grant_type=client_credentials"
+  });
+  if (!res.ok) throw new Error("token request failed: " + res.status);
+  const token = (await res.json()).access_token;
+  if (!token) throw new Error("no access token returned");
+  return token;
+}
+
 function normalize(s) {
   return String(s).toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -65,7 +109,6 @@ function json(body) {
   return new Response(JSON.stringify(body), {
     headers: {
       "content-type": "application/json",
-      // cached at Netlify's edge for an hour so Spotify isn't hit per visitor
       "cache-control": "public, max-age=0, s-maxage=3600"
     }
   });
