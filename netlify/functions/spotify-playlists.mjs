@@ -1,40 +1,38 @@
-const SPOTIFY_USER = "grifforama";
-
-export default async (req) => {
+export default async () => {
   const id = process.env.SPOTIFY_CLIENT_ID;
   const secret = process.env.SPOTIFY_CLIENT_SECRET;
-  if (!id || !secret) return json({ map: {}, error: "credentials not set" });
-
-  const names = (new URL(req.url).searchParams.get("names") || "")
-    .split("|").map(n => n.trim()).filter(Boolean);
+  const refresh = process.env.SPOTIFY_REFRESH_TOKEN;
+  if (!id || !secret || !refresh) {
+    return json({ map: {}, error: "SPOTIFY_REFRESH_TOKEN not set yet" });
+  }
 
   try {
-    const res = await fetch("https://accounts.spotify.com/api/token", {
+    const tr = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",
         authorization: "Basic " + Buffer.from(id + ":" + secret).toString("base64")
       },
-      body: "grant_type=client_credentials"
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refresh
+      }).toString()
     });
-    if (!res.ok) throw new Error("token " + res.status);
-    const token = (await res.json()).access_token;
-    const auth = { authorization: "Bearer " + token };
+    if (!tr.ok) throw new Error("token " + tr.status + " " + (await tr.text()).slice(0, 150));
+    const token = (await tr.json()).access_token;
 
     const map = {};
-    let note = "";
-    for (const name of names) {
-      const url = "https://api.spotify.com/v1/search?type=playlist&q=" + encodeURIComponent(name);
-      const r = await fetch(url, { headers: auth });
-      if (!r.ok) { note = "search " + r.status + ": " + (await r.text()).slice(0, 150); break; }
-      const data = await r.json();
-      const items = ((data.playlists && data.playlists.items) || []).filter(Boolean);
-      const want = norm(name);
-      const mine = items.filter(p => p.owner && String(p.owner.id).toLowerCase() === SPOTIFY_USER);
-      const hit = mine.find(p => norm(p.name) === want) || mine[0];
-      if (hit) map[want] = hit.id;
+    let url = "https://api.spotify.com/v1/me/playlists?limit=50";
+    while (url) {
+      const r = await fetch(url, { headers: { authorization: "Bearer " + token } });
+      if (!r.ok) throw new Error("playlists " + r.status + " " + (await r.text()).slice(0, 150));
+      const d = await r.json();
+      for (const p of d.items || []) {
+        if (p && p.name && p.id) map[norm(p.name)] = p.id;
+      }
+      url = d.next;
     }
-    return json({ map, note, resolved: Object.keys(map).length + "/" + names.length });
+    return json({ map, count: Object.keys(map).length });
   } catch (e) {
     return json({ map: {}, error: String(e.message || e) });
   }
@@ -44,8 +42,8 @@ function norm(s) {
   return String(s).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function json(body) {
-  return new Response(JSON.stringify(body), {
-    headers: { "content-type": "application/json", "cache-control": "public, max-age=0, s-maxage=3600" }
+function json(b) {
+  return new Response(JSON.stringify(b), {
+    headers: { "content-type": "application/json", "cache-control": "public, max-age=0, s-maxage=600" }
   });
 }
