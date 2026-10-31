@@ -326,9 +326,10 @@
   // ---- Spotify map, resolved automatically by the Netlify function --------
   // The hardcoded SPOTIFY object above is only a fallback for when the
   // function is unavailable; anything it returns takes precedence.
-  var SPOTIFY_FN = "/.netlify/functions/spotify-playlists";
-  var SPOTIFY_CACHE = "spotify_map_v1";
-  var SPOTIFY_TTL_MS = 60 * 60 * 1000; // 1 hour
+  // spotify-map.json lives in the repo: add one line per new playlist.
+  var SPOTIFY_FN = "/spotify-map.json";
+  var SPOTIFY_CACHE = "spotify_map_v2";
+  var SPOTIFY_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   function applySpotifyLinks() {
     Array.prototype.forEach.call(document.querySelectorAll("a.listen.spotify"), function (a) {
@@ -350,23 +351,18 @@
       if (Date.now() - cachedMap.at < SPOTIFY_TTL_MS) return;
     }
 
-    var url = SPOTIFY_FN;
-    if (names && names.length) {
-      url += "?names=" + encodeURIComponent(names.join("|"));
-    }
-
-    fetch(url).then(function (r) {
+    fetch(SPOTIFY_FN, { cache: "no-cache" }).then(function (r) {
       if (!r.ok) throw new Error(r.status);
       return r.json();
-    }).then(function (d) {
-      if (!d || !d.map || !Object.keys(d.map).length) return;
-      Object.assign(SPOTIFY, d.map);
+    }).then(function (m) {
+      if (!m || !Object.keys(m).length) return;
+      Object.assign(SPOTIFY, m);
       applySpotifyLinks();
       try {
-        localStorage.setItem(SPOTIFY_CACHE, JSON.stringify({ at: Date.now(), map: d.map }));
+        localStorage.setItem(SPOTIFY_CACHE, JSON.stringify({ at: Date.now(), map: m }));
       } catch (e) { /* ignore */ }
     }).catch(function () {
-      /* fall back to the hardcoded map / search links */
+      /* fall back to the built-in map / search links */
     });
   }
 
