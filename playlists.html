@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Griff's Playlists — WXTI</title>
+<meta name="description" content="The WXTI playlist series, on YouTube Music.">
+<style>
+  :root {
+    --bg: #e7dcc9;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-soft: #6b6b6b;
+    --line: #e6e3de;
+    --accent: #c8501e;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(190, 70, 25, 0.32), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(195, 135, 55, 0.38), transparent 55%),
+      linear-gradient(180deg, #eddcc2 0%, #e7dcc9 45%, #e2d6c1 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    position: relative;
+  }
+  a { color: inherit; }
+
+  .vinyl-bg {
+    position: fixed; inset: 0; z-index: -1;
+    pointer-events: none; overflow: hidden;
+  }
+  .vinyl-bg svg {
+    position: absolute; top: -320px; right: -280px;
+    width: 900px; height: 900px; opacity: 0.9;
+    animation: spin 240s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .vinyl-bg svg { animation: none; } }
+  @media (max-width: 700px) {
+    .vinyl-bg svg { width: 560px; height: 560px; top: -220px; right: -240px; }
+  }
+
+  header { max-width: 1200px; margin: 0 auto; padding: 56px 24px 8px; }
+  nav { font-size: 0.9rem; margin-bottom: 18px; }
+  nav a { color: var(--ink-soft); text-decoration: none; font-weight: 600; }
+  nav a:hover { color: var(--accent); }
+  nav .here { color: var(--accent); font-weight: 700; }
+  nav span.sep { margin: 0 8px; color: var(--ink-soft); }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 800; letter-spacing: -0.02em;
+  }
+  .subtitle { color: var(--ink-soft); margin-top: 6px; font-size: 0.95rem; }
+
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 24px 80px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 24px;
+  }
+
+  .sleeve {
+    display: block;
+    text-decoration: none;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.10);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    background: var(--surface);
+  }
+  .sleeve:hover { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(0,0,0,0.18); }
+
+  .sleeve .art {
+    aspect-ratio: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 18px;
+    color: #fff;
+  }
+  /* faint groove rings on every sleeve */
+  .sleeve .art::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: repeating-radial-gradient(circle at 88% 12%,
+      transparent 0px, transparent 9px,
+      rgba(255,255,255,0.10) 10px, transparent 11px);
+    pointer-events: none;
+  }
+  .sleeve .art.has-photo::after { display: none; }
+  .sleeve .series {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .sleeve .name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  .sleeve .art .play {
+    position: absolute;
+    right: 16px; bottom: 16px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.16);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .sleeve:hover .play { background: rgba(255,255,255,0.3); transform: scale(1.08); }
+
+  .sleeve .art-link { display: block; text-decoration: none; color: inherit; }
+  .sleeve .meta {
+    padding: 11px 16px 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .sleeve .links { display: flex; gap: 12px; min-width: 0; }
+  .sleeve .listen {
+    font-size: 0.82rem; font-weight: 650;
+    color: var(--accent); text-decoration: none; white-space: nowrap;
+  }
+  .sleeve .listen.spotify { color: #169c46; }
+  .sleeve .listen:hover { text-decoration: underline; }
+  .sleeve .tracks { font-size: 0.78rem; color: var(--ink-soft); white-space: nowrap; }
+
+  footer {
+    max-width: 1200px; margin: 0 auto; padding: 0 24px 48px;
+    color: var(--ink-soft); font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="vinyl-bg" aria-hidden="true">
+  <svg viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg" fill="none">
+    <g stroke="#c8501e">
+      <circle cx="450" cy="450" r="440" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="394" stroke-opacity="0.12" stroke-width="2"/>
+      <circle cx="450" cy="450" r="352" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="308" stroke-opacity="0.13" stroke-width="2.5"/>
+      <circle cx="450" cy="450" r="266" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="222" stroke-opacity="0.12" stroke-width="2"/>
+      <circle cx="450" cy="450" r="180" stroke-opacity="0.10" stroke-width="1.5"/>
+    </g>
+    <circle cx="450" cy="450" r="150" fill="#c8501e" fill-opacity="0.10"/>
+    <circle cx="450" cy="450" r="150" stroke="#c8501e" stroke-opacity="0.18" stroke-width="1.5"/>
+    <circle cx="450" cy="450" r="12" fill="#faf9f7" stroke="#c8501e" stroke-opacity="0.35" stroke-width="1.5"/>
+  </svg>
+</div>
+
+<header>
+  <nav>
+    <a href="index.html">Records</a><span class="sep">/</span><span class="here">Playlists</span><span class="sep">/</span><a href="shows.html">Shows</a>
+  </nav>
+  <h1>The WXTI Sessions</h1>
+  <p class="subtitle">My playlist series. Listen on YouTube Music or Spotify.</p>
+</header>
+
+<div class="status" id="status" style="max-width:1200px;margin:0 auto;padding:30px 24px;color:var(--ink-soft);font-size:0.95rem;">Loading playlists&hellip;</div>
+
+<main class="grid" id="grid"></main>
+
+<footer>Playlists hosted on YouTube Music. Updates automatically as new WXTI playlists go public.</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Config -------------------------------------------------------------
+  var API_KEY = "AIzaSyBN4nnEKYyw49mS90bVxhE5P1SteItsf6o"; // referrer-restricted, read-only
+  var HANDLE = "grifforama";
+  var FILTER = /wxti/i;                 // playlists shown on this page
+  var CACHE_KEY = "yt_playlists_wxti_v2";
+  var CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+  var API = "https://www.googleapis.com/youtube/v3/";
+
+  // Spotify playlist map: normalized YouTube title -> Spotify playlist ID.
+  // Unmapped playlists fall back to a Spotify search link.
+  var SPOTIFY = {
+    "wxti acid house":                   "5lpMhLVAnS9XTz0o3t9tk2",
+    "wxti 09_19":                        "23Zv9ZRWwuDUOMznbYO9Hd",
+    "wxti vinyl":                        "4RvJrn8p33u2Wtc2Zkx6YN",
+    "wxti 08 aug 2026":                  "6mk8JwXSWENVoiiQc9bBiJ",
+    "wxti aphex":                        "63wfnv57F4JgQWjZGyUvNf",
+    "wxti week 9 britpop years":         "6m5b0PNxQo0Whjs4G9rloG",
+    "wxti week 8":                       "4tZaEmeV0m3L5HKLFdr1vB",
+    "wxti electronic week 7":            "2hqI4Ksf50DD7PFRG09xhD",
+    "wxti week 6":                       "7akSvt8BTVXink0hUMvysC",
+    "wxti glasto over the years":        "3xmeanK1hfkQYje44lCGYM",
+    "wxti pride":                        "7pRagMKANxTIGfHjvIhs7b",
+    "wxti the ambient sessions":         "53mJt0ZjH6Int1w2LzuKab",
+    "week 3 wxti playlist":              "5UFELsgOGHjDaZpzTqsXRS",
+    "week 2 wxti":                       "65gm8un7HwHHEYfA7FaLjC",
+    "week 1 wxti":                       "0p6m1Ft1w8tHCrSu2qPSY8",
+    "week 1 cool britannia wxti 97.3fm": "2NdcgDcMswLqUJaepSnd0e"
+  };
+  function spotifyUrl(name) {
+    var id = SPOTIFY[name.toLowerCase().replace(/\s+/g, " ").trim()];
+    return id
+      ? "https://open.spotify.com/playlist/" + id
+      : "https://open.spotify.com/search/" + encodeURIComponent(name) + "/playlists";
+  }
+
+  // Warm sleeve palettes, rotated per card
+  var PALETTES = [
+    ["#c8501e", "#8a2f0c"], ["#b8874a", "#7a5220"], ["#7d5a8c", "#4d3260"],
+    ["#3e7a6c", "#1f4a40"], ["#a83a4e", "#6e1f2e"], ["#4a6d9c", "#2a4468"],
+    ["#c2762a", "#8a4c10"], ["#5f7a3e", "#3a4d20"], ["#9c4a78", "#642a4c"],
+    ["#556270", "#2f3a44"]
+  ];
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var grid = document.getElementById("grid");
+  var statusEl = document.getElementById("status");
+
+  function readCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var p = JSON.parse(raw);
+      return (p && Array.isArray(p.lists)) ? p : null;
+    } catch (e) { return null; }
+  }
+  function writeCache(lists) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), lists: lists })); }
+    catch (e) { /* fine */ }
+  }
+
+  function api(path, params) {
+    var q = Object.keys(params).map(function (k) {
+      return k + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    return fetch(API + path + "?" + q + "&key=" + API_KEY).then(function (r) {
+      if (!r.ok) throw new Error("YouTube API returned " + r.status);
+      return r.json();
+    });
+  }
+
+  function fetchLists() {
+    return api("channels", { part: "id", forHandle: HANDLE }).then(function (d) {
+      if (!d.items || !d.items.length) throw new Error("channel not found");
+      var channelId = d.items[0].id;
+      var all = [];
+      function page(token) {
+        var params = { part: "snippet,contentDetails", channelId: channelId, maxResults: 50 };
+        if (token) params.pageToken = token;
+        return api("playlists", params).then(function (res) {
+          all = all.concat(res.items || []);
+          return res.nextPageToken ? page(res.nextPageToken) : all;
+        });
+      }
+      return page(null);
+    }).then(function (items) {
+      return items.filter(function (it) {
+        return FILTER.test(it.snippet.title);
+      }).sort(function (a, b) {
+        return b.snippet.publishedAt.localeCompare(a.snippet.publishedAt);
+      }).map(function (it) {
+        var t = it.snippet.thumbnails || {};
+        var pick = t.standard || t.high || t.medium || t.default || null;
+        var thumb = (pick && pick.url.indexOf("no_thumbnail") === -1) ? pick.url : "";
+        return { name: it.snippet.title, id: it.id, tracks: it.contentDetails.itemCount, thumb: thumb };
+      });
+    });
+  }
+
+  function render(lists) {
+    grid.innerHTML = "";
+    statusEl.style.display = "none";
+    if (!lists.length) {
+      statusEl.style.display = "";
+      statusEl.textContent = "No public WXTI playlists right now.";
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    lists.forEach(function (p, i) {
+      var pal = PALETTES[i % PALETTES.length];
+      var ytUrl = "https://music.youtube.com/playlist?list=" + esc(p.id);
+      var card = document.createElement("div");
+      card.className = "sleeve";
+      var artStyle = p.thumb
+        ? "background:linear-gradient(180deg, rgba(10,8,6,0.45) 0%, rgba(10,8,6,0.05) 35%, rgba(10,8,6,0.72) 100%), " +
+          "url('" + esc(p.thumb) + "') center/cover no-repeat, linear-gradient(145deg," + pal[0] + "," + pal[1] + ");"
+        : "background:linear-gradient(145deg," + pal[0] + "," + pal[1] + ");";
+      card.innerHTML =
+        '<a class="art-link" href="' + ytUrl + '" target="_blank" rel="noopener">' +
+        '<div class="art' + (p.thumb ? " has-photo" : "") + '" style="' + artStyle + '">' +
+          '<div class="series">WXTI &middot; Playlist</div>' +
+          '<div class="name">' + esc(p.name) + "</div>" +
+          '<div class="play">&#9654;</div>' +
+        "</div></a>" +
+        '<div class="meta">' +
+          '<span class="links">' +
+            '<a class="listen" href="' + ytUrl + '" target="_blank" rel="noopener">YouTube Music &rarr;</a>' +
+            '<a class="listen spotify" data-pl="' + esc(p.name) + '" href="' + esc(spotifyUrl(p.name)) + '" target="_blank" rel="noopener">Spotify &rarr;</a>' +
+          "</span>" +
+          (p.tracks ? '<span class="tracks">' + p.tracks + " tracks</span>" : "") +
+        "</div>";
+      frag.appendChild(card);
+    });
+    grid.appendChild(frag);
+  }
+
+  // ---- Spotify map, resolved automatically by the Netlify function --------
+  // The hardcoded SPOTIFY object above is only a fallback for when the
+  // function is unavailable; anything it returns takes precedence.
+  var SPOTIFY_FN = "/.netlify/functions/spotify-playlists";
+  var SPOTIFY_CACHE = "spotify_map_v1";
+  var SPOTIFY_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+  function applySpotifyLinks() {
+    Array.prototype.forEach.call(document.querySelectorAll("a.listen.spotify"), function (a) {
+      var name = a.getAttribute("data-pl");
+      if (name) a.href = spotifyUrl(name);
+    });
+  }
+
+  function loadSpotifyMap() {
+    var cachedMap = null;
+    try {
+      var raw = localStorage.getItem(SPOTIFY_CACHE);
+      if (raw) cachedMap = JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+
+    if (cachedMap && cachedMap.map) {
+      Object.assign(SPOTIFY, cachedMap.map);
+      applySpotifyLinks();
+      if (Date.now() - cachedMap.at < SPOTIFY_TTL_MS) return;
+    }
+
+    fetch(SPOTIFY_FN).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (d) {
+      if (!d || !d.map || !Object.keys(d.map).length) return;
+      Object.assign(SPOTIFY, d.map);
+      applySpotifyLinks();
+      try {
+        localStorage.setItem(SPOTIFY_CACHE, JSON.stringify({ at: Date.now(), map: d.map }));
+      } catch (e) { /* ignore */ }
+    }).catch(function () {
+      /* fall back to the hardcoded map / search links */
+    });
+  }
+
+  // Show cached list instantly, but always re-check in the background.
+  var cached = readCache();
+  if (cached) render(cached.lists);
+
+  fetchLists().then(function (lists) {
+    writeCache(lists);
+    render(lists);
+    applySpotifyLinks();
+  }).catch(function (err) {
+    if (cached) return; // stale view already shown
+    statusEl.textContent = "Couldn’t load playlists (" + err.message + "). Try refreshing.";
+  });
+
+  loadSpotifyMap();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collection Scanner</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Scan a CD or vinyl sleeve and add the release to a Discogs collection.">
+<style>
+  :root {
+    --bg: #e7dcc9;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-soft: #6b6b6b;
+    --line: #e6e3de;
+    --accent: #c8501e;
+    --ok: #169c46;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(190, 70, 25, 0.32), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(195, 135, 55, 0.38), transparent 55%),
+      linear-gradient(180deg, #eddcc2 0%, #e7dcc9 45%, #e2d6c1 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 32px 20px 80px; }
+  nav { font-size: 0.9rem; margin-bottom: 18px; }
+  nav a { color: var(--ink-soft); text-decoration: none; font-weight: 600; }
+  nav a:hover { color: var(--accent); }
+  nav .here { color: var(--accent); font-weight: 700; }
+  nav .sep { margin: 0 8px; color: var(--ink-soft); }
+  h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; }
+  .subtitle { color: var(--ink-soft); font-size: 0.92rem; margin-top: 4px; }
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.10);
+    padding: 20px;
+    margin-top: 20px;
+  }
+  label { display: block; font-size: 0.82rem; font-weight: 650; margin: 14px 0 4px; }
+  label:first-child { margin-top: 0; }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  .hint { font-size: 0.76rem; color: var(--ink-soft); margin-top: 3px; }
+  .hint a { color: var(--accent); }
+  button.primary {
+    width: 100%;
+    margin-top: 18px;
+    padding: 13px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+  button.ghost {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 12px;
+  }
+  .fmt {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .fmt button {
+    flex: 1;
+    padding: 9px 0;
+    border: none;
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .fmt button + button { border-left: 1px solid var(--line); }
+  .fmt button.active { background: var(--accent); color: #fff; }
+  .snap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 20px;
+    border: 2px dashed var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .snap .big { font-size: 2.2rem; }
+  #preview { width: 100%; border-radius: 8px; display: none; margin-top: 14px; }
+  .status { margin-top: 14px; font-size: 0.9rem; color: var(--ink-soft); }
+  .status.err { color: #b3261e; }
+  .status.ok { color: var(--ok); font-weight: 650; }
+  .guess {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: #faf6ee;
+    border-radius: 8px;
+    font-size: 0.92rem;
+  }
+  .guess b { font-weight: 750; }
+  .result {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  .result:hover { border-color: var(--accent); }
+  .result.adding { opacity: 0.6; pointer-events: none; }
+  .result.added { border-color: var(--ok); background: #f0faf3; }
+  .result img { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--line); }
+  .result .info { min-width: 0; flex: 1; }
+  .result .t { font-size: 0.88rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result .d { font-size: 0.76rem; color: var(--ink-soft); }
+  .result .addlbl { font-size: 0.78rem; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+  .result.added .addlbl { color: var(--ok); }
+  .row { display: flex; gap: 10px; margin-top: 14px; }
+  .row input { flex: 1; }
+  .row button {
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 650;
+    color: var(--accent);
+  }
+  .footer-note { margin-top: 26px; font-size: 0.75rem; color: var(--ink-soft); text-align: center; }
+  .footer-note a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a href="index.html">Records</a><span class="sep">/</span><a href="playlists.html">Playlists</a><span class="sep">/</span><a href="shows.html">Shows</a><span class="sep">/</span><span class="here">Scan</span>
+  </nav>
+  <h1>Collection Scanner</h1>
+  <p class="subtitle">Photograph a sleeve, pick the pressing, it lands in your Discogs collection.</p>
+
+  <!-- Setup -->
+  <div class="card" id="setup" style="display:none;">
+    <label>Discogs username</label>
+    <input type="text" id="cfg-user" autocomplete="off" placeholder="your-username">
+    <label>Discogs personal access token</label>
+    <input type="password" id="cfg-discogs" autocomplete="off" placeholder="paste token">
+    <div class="hint">Discogs &rarr; Settings &rarr; <a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Developers</a> &rarr; Generate new token</div>
+    <label>Anthropic API key (for cover recognition)</label>
+    <input type="password" id="cfg-anthropic" autocomplete="off" placeholder="sk-ant-...">
+    <div class="hint">From <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>. Leave blank to use manual search only.</div>
+    <button class="primary" id="cfg-save">Save on this device</button>
+    <div class="hint" style="margin-top:10px;">Keys are stored only in this browser and sent only to Discogs / Anthropic directly.</div>
+  </div>
+
+  <!-- Scanner -->
+  <div id="scanner" style="display:none;">
+    <div class="card">
+      <div class="fmt" id="fmt" role="group" aria-label="Format">
+        <button data-fmt="CD">CD</button>
+        <button data-fmt="Vinyl">Vinyl</button>
+        <button data-fmt="">Both</button>
+      </div>
+      <div class="snap" id="snap">
+        <div class="big">&#128247;</div>
+        <div><b>Snap the sleeve &mdash; front or back</b><br>good light, filling the frame. No text on the front? Use the back: the tracklist identifies it best.</div>
+      </div>
+      <input type="file" id="file" accept="image/*" capture="environment" style="display:none;">
+      <img id="preview" alt="">
+      <div class="status" id="status"></div>
+      <div class="guess" id="guess" style="display:none;"></div>
+      <div id="results"></div>
+      <div class="row">
+        <input type="text" id="manual" placeholder="or search Discogs by text / cat#" autocomplete="off">
+        <button id="manual-go">Search</button>
+      </div>
+      <button class="ghost" id="reset-keys">Settings</button>
+    </div>
+    <div class="footer-note">Adds to your Discogs collection &rarr; appears on <a href="index.html">the site</a> automatically.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var LS = "cd_scanner_cfg_v1";
+  var MODEL = "claude-sonnet-5"; // stronger visual recognition for obscure / text-free covers
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function cfg() {
+    try { return JSON.parse(localStorage.getItem(LS)) || null; } catch (e) { return null; }
+  }
+  function saveCfg(c) {
+    try { localStorage.setItem(LS, JSON.stringify(c)); } catch (e) { /* ignore */ }
+  }
+
+  function show(which) {
+    $("setup").style.display = which === "setup" ? "" : "none";
+    $("scanner").style.display = which === "scanner" ? "" : "none";
+  }
+
+  function setStatus(msg, cls) {
+    var s = $("status");
+    s.className = "status" + (cls ? " " + cls : "");
+    s.textContent = msg || "";
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ---- Setup screen -------------------------------------------------------
+  $("cfg-save").addEventListener("click", function () {
+    var c = {
+      user: $("cfg-user").value.trim(),
+      discogs: $("cfg-discogs").value.trim(),
+      anthropic: $("cfg-anthropic").value.trim()
+    };
+    if (!c.user || !c.discogs) { alert("Discogs username and token are required."); return; }
+    saveCfg(c);
+    show("scanner");
+  });
+  $("reset-keys").addEventListener("click", function () {
+    var c = cfg() || {};
+    $("cfg-user").value = c.user || "";
+    $("cfg-discogs").value = c.discogs || "";
+    $("cfg-anthropic").value = c.anthropic || "";
+    show("setup");
+  });
+
+  // ---- Format (CD / Vinyl / Both) ----------------------------------------
+  var FMT_KEY = "cd_scanner_format";
+  var format = "CD";
+  try {
+    var savedFmt = localStorage.getItem(FMT_KEY);
+    if (savedFmt !== null) format = savedFmt;
+  } catch (e) { /* ignore */ }
+
+  function fmtParam() {
+    return format ? "&format=" + encodeURIComponent(format) : "";
+  }
+  function paintFmt() {
+    Array.prototype.forEach.call($("fmt").children, function (b) {
+      b.classList.toggle("active", b.getAttribute("data-fmt") === format);
+    });
+  }
+  $("fmt").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    format = b.getAttribute("data-fmt");
+    try { localStorage.setItem(FMT_KEY, format); } catch (err) { /* ignore */ }
+    paintFmt();
+  });
+  paintFmt();
+
+  // ---- Image handling -----------------------------------------------------
+  $("snap").addEventListener("click", function () { $("file").click(); });
+  $("file").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (f) handlePhoto(f);
+    this.value = "";
+  });
+
+  function downscale(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 1100;
+        var scale = Math.min(1, max / Math.max(img.width, img.height));
+        var cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * scale);
+        cv.height = Math.round(img.height * scale);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        var dataUrl = cv.toDataURL("image/jpeg", 0.85);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function handlePhoto(file) {
+    $("results").innerHTML = "";
+    $("guess").style.display = "none";
+    downscale(file).then(function (dataUrl) {
+      var p = $("preview");
+      p.src = dataUrl;
+      p.style.display = "block";
+      var c = cfg();
+      if (!c.anthropic) {
+        setStatus("No AI key saved — type the album into the search box below.", "err");
+        return;
+      }
+      setStatus("Identifying cover…");
+      return identify(dataUrl.split(",")[1], c.anthropic).then(function (g) {
+        var cands = (g && g.candidates || []).filter(function (x) {
+          return x && x.album && x.album.split(" ").length <= 8 &&
+                 !/pattern|design|artwork|abstract|unknown/i.test((x.artist || "") + " " + x.album);
+        });
+        if (!cands.length) {
+          if (g && g.catno) return searchCandidates([], g.catno);
+          setStatus("Couldn't name this cover. Best fix: snap the BACK cover — the tracklist identifies it far more reliably. Or use the text search below.", "err");
+          return;
+        }
+        var best = cands[0];
+        $("guess").style.display = "";
+        $("guess").innerHTML = "Looks like: <b>" + esc(best.artist || "?") + " &mdash; " + esc(best.album) + "</b>" +
+          (cands.length > 1 ? " <span style='color:var(--ink-soft)'>(or " +
+            cands.slice(1).map(function (x) { return esc((x.artist ? x.artist + " — " : "") + x.album); }).join("; ") + ")</span>" : "") +
+          (g.catno ? " &middot; cat# " + esc(g.catno) : "");
+        return searchCandidates(cands, g.catno);
+      });
+    }).catch(function (err) {
+      setStatus("Problem: " + err.message + " — try another photo or the text search.", "err");
+    });
+  }
+
+  // ---- Claude vision ------------------------------------------------------
+  function identify(b64, key) {
+    return fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 300,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+            { type: "text", text: "This is a photo of a music release — a CD or a vinyl record (front cover, back cover, or spine). Identify the actual release — use any visible text (artist, title, tracklist, label, catalogue number) or recognise famous artwork. Give up to 3 candidate identifications, best first. IMPORTANT: candidates must be real artist and album NAMES only. If you cannot name the actual release, return an empty candidates list — NEVER put a visual description of the artwork in the artist or album fields. Reply with ONLY a JSON object, no other text: {\"candidates\": [{\"artist\": \"...\", \"album\": \"...\"}], \"catno\": \"catalogue number if visible, else null\"}" }
+          ]
+        }]
+      })
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (e) {
+        throw new Error("AI: " + ((e.error && e.error.message) || r.status));
+      });
+      return r.json();
+    }).then(function (d) {
+      var text = (d.content && d.content[0] && d.content[0].text) || "";
+      var m = text.match(/\{[\s\S]*\}/);
+      return m ? JSON.parse(m[0]) : null;
+    });
+  }
+
+  // ---- Discogs ------------------------------------------------------------
+  function dget(url) {
+    var c = cfg();
+    return fetch(url + (url.indexOf("?") > -1 ? "&" : "?") + "token=" + encodeURIComponent(c.discogs))
+      .then(function (r) {
+        if (!r.ok) throw new Error("Discogs: " + r.status);
+        return r.json();
+      });
+  }
+
+  // Try each candidate: strict artist+title first, then loose free-text, then cat#.
+  function searchCandidates(cands, catno) {
+    setStatus("Searching Discogs for CD pressings…");
+    var base = "https://api.discogs.com/database/search?type=release&per_page=8" + fmtParam();
+    var attempts = [];
+    cands.forEach(function (g) {
+      attempts.push(base +
+        (g.artist ? "&artist=" + encodeURIComponent(g.artist) : "") +
+        "&release_title=" + encodeURIComponent(g.album));
+      attempts.push(base + "&q=" +
+        encodeURIComponent(((g.artist || "") + " " + g.album).trim()));
+    });
+    if (catno) {
+      attempts.push(base + "&catno=" + encodeURIComponent(catno));
+    }
+    function tryNext(i) {
+      if (i >= attempts.length) return [];
+      return dget(attempts[i]).then(function (d) {
+        var r = d.results || [];
+        return r.length ? r : tryNext(i + 1);
+      });
+    }
+    return tryNext(0).then(renderResults);
+  }
+
+  function manualSearch(text) {
+    $("results").innerHTML = "";
+    $("guess").style.display = "none";
+    setStatus("Searching Discogs…");
+    dget("https://api.discogs.com/database/search?type=release&per_page=10" + fmtParam() + "&q=" +
+      encodeURIComponent(text))
+      .then(function (d) { renderResults(d.results || []); })
+      .catch(function (err) { setStatus("Problem: " + err.message, "err"); });
+  }
+  $("manual-go").addEventListener("click", function () {
+    var t = $("manual").value.trim();
+    if (t) manualSearch(t);
+  });
+  $("manual").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); $("manual-go").click(); }
+  });
+
+  function renderResults(results) {
+    if (!results.length) {
+      setStatus("No CD pressings found — try the text search with the catalogue number from the spine.", "err");
+      return;
+    }
+    setStatus("Tap the pressing you own:");
+    var box = $("results");
+    box.innerHTML = "";
+    results.forEach(function (r) {
+      var el = document.createElement("div");
+      el.className = "result";
+      el.innerHTML =
+        '<img loading="lazy" src="' + esc(r.thumb || "") + '" alt="">' +
+        '<div class="info"><div class="t">' + esc(r.title) + "</div>" +
+        '<div class="d">' + esc([r.year, r.country, (r.label && r.label[0]), r.catno].filter(Boolean).join(" · ")) + "</div></div>" +
+        '<div class="addlbl">Add +</div>';
+      el.addEventListener("click", function () { addToCollection(r, el); });
+      box.appendChild(el);
+    });
+  }
+
+  function addToCollection(r, el) {
+    if (el.classList.contains("added")) return;
+    el.classList.add("adding");
+    var c = cfg();
+    fetch("https://api.discogs.com/users/" + encodeURIComponent(c.user) +
+      "/collection/folders/1/releases/" + r.id + "?token=" + encodeURIComponent(c.discogs),
+      { method: "POST" })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("Discogs: " + resp.status);
+        el.classList.remove("adding");
+        el.classList.add("added");
+        el.querySelector(".addlbl").textContent = "Added ✓";
+        setStatus("In your collection. Snap the next one!", "ok");
+      })
+      .catch(function (err) {
+        el.classList.remove("adding");
+        setStatus("Couldn't add (" + err.message + "). Check your token has access.", "err");
+      });
+  }
+
+  // ---- Boot ---------------------------------------------------------------
+  show(cfg() ? "scanner" : "setup");
+})();
+</script>
+</body>
+</html>

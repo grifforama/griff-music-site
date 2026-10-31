@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Griff's Record Collection</title>
+<meta name="description" content="My vinyl collection, live from Discogs.">
+<style>
+  :root {
+    --bg: #e7dcc9;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-soft: #6b6b6b;
+    --line: #e6e3de;
+    --accent: #c8501e;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(190, 70, 25, 0.32), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(195, 135, 55, 0.38), transparent 55%),
+      linear-gradient(180deg, #eddcc2 0%, #e7dcc9 45%, #e2d6c1 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    position: relative;
+  }
+
+  /* Vinyl groove graphic behind the header */
+  .vinyl-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .vinyl-bg svg {
+    position: absolute;
+    top: -320px;
+    right: -280px;
+    width: 900px;
+    height: 900px;
+    opacity: 0.9;
+    animation: spin 240s linear infinite;
+  }
+  .vinyl-bg svg.small {
+    top: auto; right: auto;
+    bottom: -420px; left: -380px;
+    width: 760px; height: 760px;
+    opacity: 0.6;
+    animation-duration: 320s;
+    animation-direction: reverse;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .vinyl-bg svg { animation: none; }
+  }
+  @media (max-width: 700px) {
+    .vinyl-bg svg { width: 560px; height: 560px; top: -220px; right: -240px; }
+    .vinyl-bg svg.small { display: none; }
+  }
+  a { color: inherit; }
+
+  header {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 56px 24px 8px;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .subtitle { color: var(--ink-soft); margin-top: 6px; font-size: 0.95rem; }
+  .subtitle a { color: var(--accent); text-decoration: none; }
+  .subtitle a:hover { text-decoration: underline; }
+
+  .stats {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .stat .num { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; }
+  .stat .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+
+  .controls {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 24px 4px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+    padding-bottom: 14px;
+  }
+  .controls input[type="search"] {
+    flex: 1 1 220px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    outline: none;
+  }
+  .controls input[type="search"]:focus { border-color: var(--accent); }
+  .controls select {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+  }
+  .refresh {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    color: var(--ink-soft);
+  }
+  .refresh:hover { color: var(--accent); border-color: var(--accent); }
+
+  .status {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  .status .bar {
+    height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 12px;
+    max-width: 320px;
+  }
+  .status .bar i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.4s ease;
+  }
+  .status.error { color: #b3261e; }
+
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 24px 80px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 22px;
+  }
+  .card { cursor: pointer; }
+  .card .cover {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--line);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .card:hover .cover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+  }
+  .card img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .card .meta { padding: 9px 2px 0; }
+  .card .artist {
+    font-weight: 650;
+    font-size: 0.86rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card .title {
+    font-size: 0.83rem;
+    color: var(--ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card .year { font-size: 0.75rem; color: var(--ink-soft); opacity: 0.75; }
+
+  .empty { grid-column: 1 / -1; color: var(--ink-soft); padding: 40px 0; text-align: center; }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .view-toggle button {
+    border: none;
+    background: none;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    line-height: 1;
+  }
+  .view-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* List view */
+  .grid.as-list {
+    display: block;
+  }
+  .grid.as-list .card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 8px 14px 8px 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .grid.as-list .card:hover .cover { transform: none; }
+  .grid.as-list .cover {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    aspect-ratio: auto;
+    border-radius: 6px;
+    box-shadow: none;
+  }
+  .grid.as-list .card .meta {
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .grid.as-list .card .artist { font-size: 0.9rem; }
+  .grid.as-list .card .title { font-size: 0.87rem; flex: 1; min-width: 0; }
+  .grid.as-list .card .year { font-size: 0.78rem; margin-left: auto; flex-shrink: 0; }
+  @media (max-width: 560px) {
+    .grid.as-list .card .meta { display: block; }
+    .grid.as-list .card .year { display: none; }
+  }
+
+  /* Detail modal */
+  dialog {
+    border: none;
+    border-radius: 14px;
+    padding: 0;
+    max-width: 680px;
+    width: calc(100vw - 40px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  }
+  dialog::backdrop { background: rgba(20,15,10,0.55); backdrop-filter: blur(3px); }
+  .modal {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    background: var(--surface);
+  }
+  .modal img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .modal .info { padding: 24px 26px; }
+  .modal h2 { font-size: 1.25rem; letter-spacing: -0.01em; }
+  .modal .m-artist { color: var(--accent); font-weight: 650; margin-bottom: 2px; }
+  .modal .m-line { color: var(--ink-soft); font-size: 0.88rem; margin-top: 10px; }
+  .modal .tags { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .modal .tag {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-soft);
+  }
+  .modal .m-link {
+    display: inline-block;
+    margin-top: 18px;
+    font-size: 0.88rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .modal .m-link:hover { text-decoration: underline; }
+  .modal .m-link.yt { margin-left: 18px; }
+  .modal .m-link.spotify { color: #169c46; }
+  .modal .close {
+    position: absolute; top: 10px; right: 12px;
+    border: none; background: rgba(0,0,0,0.45); color: #fff;
+    width: 30px; height: 30px; border-radius: 50%;
+    font-size: 1rem; cursor: pointer; line-height: 1;
+  }
+  @media (max-width: 560px) {
+    .modal { grid-template-columns: 1fr; }
+    .modal img { max-height: 300px; }
+  }
+
+  footer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="vinyl-bg" aria-hidden="true">
+  <svg viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg" fill="none">
+    <g stroke="#c8501e">
+      <circle cx="450" cy="450" r="440" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="416" stroke-opacity="0.07" stroke-width="1"/>
+      <circle cx="450" cy="450" r="394" stroke-opacity="0.12" stroke-width="2"/>
+      <circle cx="450" cy="450" r="372" stroke-opacity="0.06" stroke-width="1"/>
+      <circle cx="450" cy="450" r="352" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="330" stroke-opacity="0.07" stroke-width="1"/>
+      <circle cx="450" cy="450" r="308" stroke-opacity="0.13" stroke-width="2.5"/>
+      <circle cx="450" cy="450" r="286" stroke-opacity="0.06" stroke-width="1"/>
+      <circle cx="450" cy="450" r="266" stroke-opacity="0.10" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="244" stroke-opacity="0.08" stroke-width="1"/>
+      <circle cx="450" cy="450" r="222" stroke-opacity="0.12" stroke-width="2"/>
+      <circle cx="450" cy="450" r="200" stroke-opacity="0.07" stroke-width="1"/>
+      <circle cx="450" cy="450" r="180" stroke-opacity="0.10" stroke-width="1.5"/>
+    </g>
+    <circle cx="450" cy="450" r="150" fill="#c8501e" fill-opacity="0.10"/>
+    <circle cx="450" cy="450" r="150" stroke="#c8501e" stroke-opacity="0.18" stroke-width="1.5"/>
+    <circle cx="450" cy="450" r="12" fill="#faf9f7" stroke="#c8501e" stroke-opacity="0.35" stroke-width="1.5"/>
+  </svg>
+  <svg class="small" viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg" fill="none">
+    <g stroke="#b8874a">
+      <circle cx="450" cy="450" r="440" stroke-opacity="0.12" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="410" stroke-opacity="0.08" stroke-width="1"/>
+      <circle cx="450" cy="450" r="382" stroke-opacity="0.13" stroke-width="2"/>
+      <circle cx="450" cy="450" r="354" stroke-opacity="0.07" stroke-width="1"/>
+      <circle cx="450" cy="450" r="328" stroke-opacity="0.11" stroke-width="1.5"/>
+      <circle cx="450" cy="450" r="302" stroke-opacity="0.08" stroke-width="1"/>
+      <circle cx="450" cy="450" r="276" stroke-opacity="0.13" stroke-width="2.5"/>
+      <circle cx="450" cy="450" r="250" stroke-opacity="0.07" stroke-width="1"/>
+      <circle cx="450" cy="450" r="226" stroke-opacity="0.11" stroke-width="1.5"/>
+    </g>
+    <circle cx="450" cy="450" r="190" fill="#b8874a" fill-opacity="0.10"/>
+    <circle cx="450" cy="450" r="190" stroke="#b8874a" stroke-opacity="0.18" stroke-width="1.5"/>
+  </svg>
+</div>
+
+<header>
+  <nav style="font-size:0.9rem;margin-bottom:18px;">
+    <span style="color:var(--accent);font-weight:700;">Records</span>
+    <span style="margin:0 8px;color:var(--ink-soft);">/</span>
+    <a href="playlists.html" style="color:var(--ink-soft);text-decoration:none;font-weight:600;">Playlists</a>
+    <span style="margin:0 8px;color:var(--ink-soft);">/</span>
+    <a href="shows.html" style="color:var(--ink-soft);text-decoration:none;font-weight:600;">Shows</a>
+  </nav>
+  <h1>Griff&rsquo;s Record Collection</h1>
+  <p class="subtitle">Live from <a id="profile-link" href="#" target="_blank" rel="noopener">Discogs</a> &middot; <span id="updated"></span></p>
+  <div class="stats" id="stats" hidden>
+    <div class="stat"><div class="num" id="stat-count">–</div><div class="lbl">Records</div></div>
+    <div class="stat"><div class="num" id="stat-artists">–</div><div class="lbl">Artists</div></div>
+    <div class="stat"><div class="num" id="stat-genres">–</div><div class="lbl">Genres</div></div>
+    <div class="stat"><div class="num" id="stat-span">–</div><div class="lbl">Years</div></div>
+  </div>
+</header>
+
+<div class="controls" id="controls" hidden>
+  <input type="search" id="search" placeholder="Search artist, title, label&hellip;" autocomplete="off">
+  <select id="genre-filter"><option value="">All genres</option></select>
+  <select id="format-filter"><option value="">All formats</option></select>
+  <select id="sort">
+    <option value="added-desc">Recently added</option>
+    <option value="artist-asc">Artist A&ndash;Z</option>
+    <option value="title-asc">Title A&ndash;Z</option>
+    <option value="year-desc">Year (newest)</option>
+    <option value="year-asc">Year (oldest)</option>
+  </select>
+  <div class="view-toggle" role="group" aria-label="View">
+    <button id="view-grid" title="Grid view" aria-label="Grid view">&#9638;</button>
+    <button id="view-list" title="List view" aria-label="List view">&#9776;</button>
+  </div>
+  <button class="refresh" id="refresh" title="Re-fetch from Discogs">&#8635; Refresh</button>
+</div>
+
+<div class="status" id="status">
+  Loading collection&hellip;
+  <div class="bar"><i id="progress"></i></div>
+</div>
+
+<main class="grid" id="grid"></main>
+
+<dialog id="detail"></dialog>
+
+<footer>Data from the Discogs API. Cover art &copy; respective owners.</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Config -------------------------------------------------------------
+  var USERNAME = "grifforama";          // your Discogs username
+  var PER_PAGE = 100;                    // max allowed by Discogs
+  var CACHE_KEY = "discogs_collection_" + USERNAME;
+  var CACHE_TTL_MS = 6 * 60 * 60 * 1000; // re-fetch automatically after 6h
+  var API_BASE = "https://api.discogs.com/users/" + USERNAME +
+                 "/collection/folders/0/releases";
+
+  document.getElementById("profile-link").href =
+    "https://www.discogs.com/user/" + USERNAME + "/collection";
+
+  // ---- State --------------------------------------------------------------
+  var records = [];
+  var view = [];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var grid = $("grid"), statusEl = $("status"), progressEl = $("progress");
+
+  // ---- Cache (best-effort; site works without it) -------------------------
+  function readCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.records)) return null;
+      return parsed;
+    } catch (e) { return null; }
+  }
+  function writeCache(recs) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), records: recs }));
+    } catch (e) { /* quota or unavailable — fine */ }
+  }
+
+  // ---- Fetching -----------------------------------------------------------
+  function fetchPage(page) {
+    var url = API_BASE + "?per_page=" + PER_PAGE + "&page=" + page +
+              "&sort=added&sort_order=desc";
+    return fetch(url, { headers: { "Accept": "application/vnd.discogs.v2+json" } })
+      .then(function (res) {
+        if (res.status === 429) {
+          // Rate limited: wait 65s and retry once.
+          setStatus("Discogs rate limit hit — waiting a minute&hellip;");
+          return new Promise(function (resolve) {
+            setTimeout(function () { resolve(fetchPage(page)); }, 65000);
+          });
+        }
+        if (!res.ok) throw new Error("Discogs returned " + res.status);
+        return res.json();
+      });
+  }
+
+  function simplify(release) {
+    var b = release.basic_information || {};
+    var artists = (b.artists || []).map(function (a) {
+      return (a.name || "").replace(/\s*\(\d+\)$/, "");
+    }).join(", ");
+    var fmt = (b.formats && b.formats[0]) ? b.formats[0] : {};
+    var label = (b.labels && b.labels[0]) ? b.labels[0] : {};
+    return {
+      id: b.id,
+      artist: artists || "Unknown artist",
+      title: b.title || "Untitled",
+      year: b.year || 0,
+      thumb: b.thumb || "",
+      cover: b.cover_image || b.thumb || "",
+      format: fmt.name || "",
+      formatDetail: [fmt.name, (fmt.descriptions || []).join(", "), fmt.text]
+                      .filter(Boolean).join(" · "),
+      label: label.name || "",
+      catno: label.catno || "",
+      genres: b.genres || [],
+      styles: b.styles || [],
+      added: release.date_added || "",
+      url: "https://www.discogs.com/release/" + b.id
+    };
+  }
+
+  function fetchAll() {
+    setStatus("Fetching collection from Discogs&hellip;");
+    progressEl.style.width = "5%";
+    return fetchPage(1).then(function (first) {
+      var pages = (first.pagination && first.pagination.pages) || 1;
+      var all = first.releases.slice();
+      progressEl.style.width = (100 / pages) + "%";
+
+      // Fetch remaining pages sequentially (stays well under 25 req/min).
+      var chain = Promise.resolve();
+      for (var p = 2; p <= pages; p++) {
+        (function (page) {
+          chain = chain.then(function () {
+            return fetchPage(page).then(function (data) {
+              all = all.concat(data.releases);
+              progressEl.style.width = Math.round(100 * page / pages) + "%";
+            });
+          });
+        })(p);
+      }
+      return chain.then(function () { return all.map(simplify); });
+    });
+  }
+
+  // ---- Rendering ----------------------------------------------------------
+  function setStatus(html, isError) {
+    statusEl.hidden = false;
+    statusEl.classList.toggle("error", !!isError);
+    statusEl.firstChild.nodeValue = "";
+    statusEl.innerHTML = html + '<div class="bar"><i id="progress"></i></div>';
+    progressEl = $("progress");
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function renderStats() {
+    var artists = new Set(), genres = new Set(), years = [];
+    records.forEach(function (r) {
+      r.artist.split(", ").forEach(function (a) { artists.add(a); });
+      r.genres.forEach(function (g) { genres.add(g); });
+      if (r.year) years.push(r.year);
+    });
+    $("stat-count").textContent = records.length;
+    $("stat-artists").textContent = artists.size;
+    $("stat-genres").textContent = genres.size;
+    $("stat-span").textContent = years.length
+      ? Math.min.apply(null, years) + "–" + Math.max.apply(null, years) : "–";
+    $("stats").hidden = false;
+  }
+
+  function populateFilters() {
+    var genres = new Set(), formats = new Set();
+    records.forEach(function (r) {
+      r.genres.forEach(function (g) { genres.add(g); });
+      if (r.format) formats.add(r.format);
+    });
+    fillSelect($("genre-filter"), genres);
+    fillSelect($("format-filter"), formats);
+  }
+  function fillSelect(sel, values) {
+    while (sel.options.length > 1) sel.remove(1);
+    Array.from(values).sort().forEach(function (v) {
+      var o = document.createElement("option");
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    });
+  }
+
+  function applyView() {
+    var q = $("search").value.trim().toLowerCase();
+    var genre = $("genre-filter").value;
+    var format = $("format-filter").value;
+    var sort = $("sort").value;
+
+    view = records.filter(function (r) {
+      if (genre && r.genres.indexOf(genre) === -1) return false;
+      if (format && r.format !== format) return false;
+      if (!q) return true;
+      return (r.artist + " " + r.title + " " + r.label + " " + r.catno)
+               .toLowerCase().indexOf(q) !== -1;
+    });
+
+    var cmp = {
+      "added-desc": function (a, b) { return b.added.localeCompare(a.added); },
+      "artist-asc": function (a, b) { return a.artist.localeCompare(b.artist) || a.year - b.year; },
+      "title-asc":  function (a, b) { return a.title.localeCompare(b.title); },
+      "year-desc":  function (a, b) { return b.year - a.year; },
+      "year-asc":   function (a, b) { return (a.year || 9999) - (b.year || 9999); }
+    }[sort];
+    if (cmp) view.sort(cmp);
+
+    renderGrid();
+  }
+
+  function renderGrid() {
+    grid.innerHTML = "";
+    if (!view.length) {
+      grid.innerHTML = '<div class="empty">No records match.</div>';
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    view.forEach(function (r, i) {
+      var card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML =
+        '<div class="cover"><img loading="lazy" alt="' + esc(r.artist + " – " + r.title) +
+        '" src="' + esc(r.cover) + '"></div>' +
+        '<div class="meta"><div class="artist">' + esc(r.artist) + "</div>" +
+        '<div class="title">' + esc(r.title) + "</div>" +
+        (r.year ? '<div class="year">' + r.year + "</div>" : "") + "</div>";
+      card.addEventListener("click", function () { openDetail(r); });
+      frag.appendChild(card);
+    });
+    grid.appendChild(frag);
+  }
+
+  function openDetail(r) {
+    var d = $("detail");
+    var tags = r.genres.concat(r.styles).map(function (t) {
+      return '<span class="tag">' + esc(t) + "</span>";
+    }).join("");
+    d.innerHTML =
+      '<div class="modal">' +
+        '<img alt="" src="' + esc(r.cover) + '">' +
+        '<div class="info">' +
+          '<div class="m-artist">' + esc(r.artist) + "</div>" +
+          "<h2>" + esc(r.title) + "</h2>" +
+          '<div class="m-line">' + esc(r.formatDetail || r.format) +
+            (r.year ? " &middot; " + r.year : "") + "</div>" +
+          (r.label ? '<div class="m-line">' + esc(r.label) +
+            (r.catno ? " &middot; " + esc(r.catno) : "") + "</div>" : "") +
+          (r.added ? '<div class="m-line">Added ' + esc(r.added.slice(0, 10)) + "</div>" : "") +
+          '<div class="tags">' + tags + "</div>" +
+          '<a class="m-link" href="' + esc(r.url) + '" target="_blank" rel="noopener">View on Discogs &rarr;</a>' +
+          '<a class="m-link yt" href="https://music.youtube.com/search?q=' +
+            encodeURIComponent((r.artist + " " + r.title).replace(/[™®©]/g, "").trim()) +
+            '" target="_blank" rel="noopener">&#9654; YouTube Music</a>' +
+          '<a class="m-link yt spotify" href="https://open.spotify.com/search/' +
+            encodeURIComponent((r.artist + " " + r.title).replace(/[™®©]/g, "").trim()) +
+            '/albums" target="_blank" rel="noopener">&#9654; Spotify</a>' +
+        "</div>" +
+        '<button class="close" aria-label="Close">&times;</button>' +
+      "</div>";
+    d.querySelector(".close").addEventListener("click", function () { d.close(); });
+    d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+    d.showModal();
+  }
+
+  function ready(recs, fetchedAt) {
+    records = recs;
+    statusEl.hidden = true;
+    $("controls").hidden = false;
+    $("updated").textContent = "updated " + new Date(fetchedAt).toLocaleString();
+    renderStats();
+    populateFilters();
+    applyView();
+  }
+
+  // ---- View mode (grid / list) -------------------------------------------
+  var VIEW_KEY = "collection_view_mode";
+  function getViewMode() {
+    try {
+      var saved = localStorage.getItem(VIEW_KEY);
+      if (saved === "grid" || saved === "list") return saved;
+    } catch (e) { /* fine */ }
+    return window.innerWidth <= 560 ? "list" : "grid";
+  }
+  function setViewMode(mode) {
+    try { localStorage.setItem(VIEW_KEY, mode); } catch (e) { /* fine */ }
+    applyViewMode(mode);
+  }
+  function applyViewMode(mode) {
+    grid.classList.toggle("as-list", mode === "list");
+    $("view-grid").classList.toggle("active", mode === "grid");
+    $("view-list").classList.toggle("active", mode === "list");
+  }
+  applyViewMode(getViewMode());
+
+  // ---- Events -------------------------------------------------------------
+  $("view-grid").addEventListener("click", function () { setViewMode("grid"); });
+  $("view-list").addEventListener("click", function () { setViewMode("list"); });
+  $("search").addEventListener("input", applyView);
+  $("genre-filter").addEventListener("change", applyView);
+  $("format-filter").addEventListener("change", applyView);
+  $("sort").addEventListener("change", applyView);
+  $("refresh").addEventListener("click", function () { load(true); });
+
+  // ---- Boot ---------------------------------------------------------------
+  function load(force) {
+    var cached = readCache();
+    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      ready(cached.records, cached.at);
+      return;
+    }
+    // Show stale cache immediately while refreshing in background.
+    if (cached) ready(cached.records, cached.at);
+
+    fetchAll().then(function (recs) {
+      writeCache(recs);
+      ready(recs, Date.now());
+    }).catch(function (err) {
+      if (records.length) return; // stale data already shown
+      setStatus(
+        "Couldn&rsquo;t load the collection (" + esc(err.message) + "). " +
+        "Check that the collection is public, then " +
+        '<a href="#" onclick="location.reload();return false;">try again</a>.', true);
+    });
+  }
+
+  load(false);
+})();
+</script>
+</body>
+</html>
