@@ -366,6 +366,19 @@
     });
   }
 
+  // Live lookup via the Netlify function (OAuth). Overlays the JSON map when
+  // it works; silently ignored when it doesn't.
+  function loadSpotifyAuto() {
+    fetch("/.netlify/functions/spotify-playlists", { cache: "no-cache" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.map || !Object.keys(d.map).length) return;
+        Object.assign(SPOTIFY, d.map);
+        applySpotifyLinks();
+      })
+      .catch(function () { /* JSON map already applied */ });
+  }
+
   function namesOf(lists) {
     return lists.map(function (l) { return l.name; });
   }
@@ -376,6 +389,7 @@
     render(cached.lists);
     loadSpotifyMap(namesOf(cached.lists));
   }
+  loadSpotifyAuto();
 
   fetchLists().then(function (lists) {
     writeCache(lists);
