@@ -4,8 +4,8 @@ export default async (req) => {
   const refresh = process.env.SPOTIFY_REFRESH_TOKEN;
   if (!id || !secret || !refresh) return json({ error: "credentials not set" });
 
-  const pid = new URL(req.url).searchParams.get("id");
-  if (!pid) return json({ error: "pass ?id=<playlistId>" });
+  const u = new URL(req.url);
+  const mode = u.searchParams.get("mode") || "list";
 
   try {
     const tr = await fetch("https://accounts.spotify.com/api/token", {
@@ -17,25 +17,46 @@ export default async (req) => {
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }).toString()
     });
     if (!tr.ok) throw new Error("token " + tr.status);
-    const tok = await tr.json();
-    const auth = { authorization: "Bearer " + tok.access_token };
+    const auth = { authorization: "Bearer " + (await tr.json()).access_token };
 
-    const tests = {
-      tracksPlain: "https://api.spotify.com/v1/playlists/" + pid + "/tracks?limit=5",
-      tracksFields: "https://api.spotify.com/v1/playlists/" + pid + "/tracks?limit=5&fields=items(track(name))",
-      playlistObj: "https://api.spotify.com/v1/playlists/" + pid,
-      mePlaylists: "https://api.spotify.com/v1/me/playlists?limit=1",
-      meProfile: "https://api.spotify.com/v1/me"
-    };
-
-    const out = {};
-    for (const k of Object.keys(tests)) {
-      const r = await fetch(tests[k], { headers: auth });
-      const body = (await r.text()).slice(0, 220);
-      out[k] = { status: r.status, body: body };
+    if (mode === "list") {
+      const offset = parseInt(u.searchParams.get("offset") || "0", 10);
+      const r = await fetch("https://api.spotify.com/v1/me/playlists?limit=50&offset=" + offset, { headers: auth });
+      if (!r.ok) throw new Error("list " + r.status);
+      const d = await r.json();
+      return json({
+        total: d.total,
+        items: (d.items || []).filter(Boolean).map(p => ({
+          id: p.id, name: p.name, owner: p.owner && p.owner.id
+        }))
+      });
     }
-    out.scope = tok.scope || "(not reported)";
-    return json(out);
+
+    const ids = (u.searchParams.get("ids") || "").split(",").filter(Boolean).slice(0, 5);
+    const fields = "tracks(total,items(track(artists(name),album(name,id,total_tracks,release_date))))";
+    const out = [];
+    for (const pid of ids) {
+      const r = await fetch("https://api.spotify.com/v1/playlists/" + pid + "?fields=" + encodeURIComponent(fields), { headers: auth });
+      if (!r.ok) { out.push({ id: pid, error: r.status }); continue; }
+      const d = await r.json();
+      const items = ((d.tracks && d.tracks.items) || []).map(i => i && i.track).filter(Boolean);
+      const artists = [...new Set(items.flatMap(t => (t.artists || []).map(a => a.name)))];
+      const albums = [...new Set(items.map(t => t.album && t.album.name).filter(Boolean))];
+      const first = items[0] && items[0].album;
+      out.push({
+        id: pid,
+        total: d.tracks ? d.tracks.total : null,
+        n: items.length,
+        artistCount: artists.length,
+        artists: artists.slice(0, 4),
+        albumCount: albums.length,
+        album: albums[0] || null,
+        albumId: first ? first.id : null,
+        albumTotal: first ? first.total_tracks : null,
+        release: first ? first.release_date : null
+      });
+    }
+    return json({ items: out });
   } catch (e) {
     return json({ error: String(e.message || e) });
   }
