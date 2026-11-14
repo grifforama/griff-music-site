@@ -211,8 +211,24 @@
     "week 1 wxti":                       "0p6m1Ft1w8tHCrSu2qPSY8",
     "week 1 cool britannia wxti 97.3fm": "2NdcgDcMswLqUJaepSnd0e"
   };
+  // AUTO = live answer from the Netlify function (authoritative, remembered
+  // between visits). SPOTIFY = manual map in spotify-map.json + the built-in
+  // list above, used only for names AUTO doesn't know. A Spotify outage can
+  // therefore never downgrade a link that has worked before.
+  var AUTO = {};
+  var AUTO_CACHE = "spotify_auto_v1";
+  try {
+    var savedAuto = JSON.parse(localStorage.getItem(AUTO_CACHE) || "null");
+    if (savedAuto && savedAuto.map) AUTO = savedAuto.map;
+  } catch (e) { /* ignore */ }
+
+  function normName(s) {
+    return String(s).toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
   function spotifyUrl(name) {
-    var id = SPOTIFY[name.toLowerCase().replace(/\s+/g, " ").trim()];
+    var k = normName(name);
+    var id = AUTO[k] || SPOTIFY[k];
     return id
       ? "https://open.spotify.com/playlist/" + id
       : "https://open.spotify.com/search/" + encodeURIComponent(name) + "/playlists";
@@ -372,11 +388,16 @@
     fetch("/.netlify/functions/spotify-playlists", { cache: "no-cache" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if (!d || !d.map || !Object.keys(d.map).length) return;
-        Object.assign(SPOTIFY, d.map);
+        // Only trust a complete, non-empty answer. Anything else (rate limit,
+        // outage, partial read) leaves the remembered map in place.
+        if (!d || d.error || !d.map || !Object.keys(d.map).length) return;
+        AUTO = d.map;
         applySpotifyLinks();
+        try {
+          localStorage.setItem(AUTO_CACHE, JSON.stringify({ at: Date.now(), map: AUTO }));
+        } catch (e) { /* ignore */ }
       })
-      .catch(function () { /* JSON map already applied */ });
+      .catch(function () { /* remembered map stays in place */ });
   }
 
   function namesOf(lists) {
